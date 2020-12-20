@@ -1,6 +1,6 @@
 <!-- TOC -->
 
-- [1. MQTT_NeoPixel_Status_Multiple](#1-mqtt_neopixel_status_multiple)
+- [1. MQTT_NeoPixel_Status_Multiple_Improved](#1-mqtt_neopixel_status_multiple_improved)
 - [2. Hardware](#2-hardware)
     - [2.1. Required Components](#21-required-components)
     - [2.2. Pinout & wiring](#22-pinout--wiring)
@@ -9,7 +9,7 @@
     - [3.2. Initial setup of the device](#32-initial-setup-of-the-device)
         - [3.2.1. WiFi & MQTT](#321-wifi--mqtt)
         - [3.2.2. Led offset](#322-led-offset)
-    - [3.3. Reset the settings](#33-reset-the-settings)
+    - [3.3. Change configuration](#33-change-configuration)
     - [3.4. OTA Firmware update](#34-ota-firmware-update)
 - [4. Controlling the LED's](#4-controlling-the-leds)
     - [4.1. MQTT Topic](#41-mqtt-topic)
@@ -19,10 +19,10 @@
 <!-- /TOC -->
 
 
-# 1. MQTT_NeoPixel_Status_Multiple
+# 1. MQTT_NeoPixel_Status_Multiple_Improved
 Drive Neopixel LEDs based on MQTT Messages. 
 
-Github Repository: [MQTT_NeoPixel_Status_Multiple ](https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple)
+Github Repository: [MQTT_NeoPixel_Status_Multiple_Improved ](https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved)
 
 Website: [https://www.vdsar.net/build-status-light-for-devops/](https://www.vdsar.net/build-status-light-for-devops/)
 
@@ -30,7 +30,7 @@ Control each individual LED of a NeoPixel LedRing (or ledstrip) by publishing a 
 
 You could use it to indicate the build status of a CI/CD build pipeline.
 
-Flash an updated firmware using your browser.
+Flash an updated firmware or change configuration using your browser.
 
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/IMG_3071-1.jpeg "Build Status Light")
@@ -50,7 +50,7 @@ The case can be 3D printed using PLA. The STL and Fusion360 files can be found h
 
 The source code for the initial version where all leds indicate the status of one pipeline: <https://github.com/arvdsar/MQTT_NeoPixel_Status>
 
-The source code for the new version where each led indicates another pipeline. <https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple>
+The source code for the new version where each led indicates another pipeline. <https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved>
 
 ## 2.2. Pinout & wiring ##
 * Connect 5V of LedRing with 5V on Wemos
@@ -72,43 +72,26 @@ Never used PlatformIO? Check this page: [PlatformIO - How to flash firmware](htt
 
 ## 3.2. Initial setup of the device ##
 Power on the device and connect your laptop to the wireless access point “AutoConnectAP” with password "password". Now visit 192.168.4.1 where you can configure the device.
+Be aware that you have to disconnect from this accesspoint before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to "AutoConnectAP" if you need to.
 
 ### 3.2.1. WiFi & MQTT ###
-Setup to WiFi and provide your MQTT details. As topic you use something like: `some/thing/#` (read more below). 
+Setup the WiFi by manually typing the SSID and provide your MQTT details. As topic you use something like: `some/thing/#` (read more below). 
 Be aware to use a unique ClientID otherwise you'll get connection errors and weird behavior. Be aware of case sensitive usernames and passwords and your computer auto correction. :-)
 
 ### 3.2.2. Led offset ###
 You can also provide a led offset. This is to align the first led to the position where you want to see the first led. At start of the device the 'real' first LED is red. Now count how many LEDs (clockwise) further you want to position the first LED and enter that value as the offset. After succesful boot of the device and connected to WiFi you will see the 'moved' LED 1 in green for 5 seconds. 
 
-
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/ledoffset.jpg "Demo of original position vs offset position")
 
-Once the device can connect to your WiFi it will never start this configuration panel anymore. The only way to change your MQTT settings or led offset is to either turn of the WiFi at home so it cannot connect or to reset the settings.
+## 3.3. Change configuration ##
+Browse to the IP of your device and it will show the current setting and a link to the configuration page. 
 
-## 3.3. Reset the settings ##
-The configuration panel is only showed when the device cannot connect to a WiFi network. To reset all the settings you have a couple of options:
-* Disable your home WiFi so the device cannot connect
-* Flash the device with reset statements
-
-Update the source code by uncommenting the following two statements. 
-
-``` C  
-//LittleFS.format();
-//wifiManager.resetSettings();
-```
-
-Now flash the updated firmware, wait a couple of seconds, comment the statements and flash the firmware again. Now you are able to configure the WiFi and MQTT settings again by following 'initial setup of the device'
-
-_This procedure also works using OTA Firmware. Continue reading._
 
 ## 3.4. OTA Firmware update ##
 As long as your device can connect to WiFi you can update the firmware via your webbrowser. Visit http://ip-address/firmware or http://esp8266-webupdate.local/firmware and you can upload a firmware file. The default user/password is admin/admin (change it in the code to make it more secure).
 
 When you 'Build' the application in PlatformIO, you can find the firmware.bin file in a hidden directory .pio in your project folder (/MQTT_NeoPixel_Status_Multiple/.pio/build/d1_mini/). Build one with and without the LittleFS.format() and wifiManager.resetSettings(); uncommented so you can easily reset settings by flashing via the browser.
 
-Flash your firmware with the 'reset' firmware. Now you can connect to the device accesspoint “AutoConnectAP”, setup the WiFi connection (and the MQTT settings if you want) and reboot. Now you can connect to the firmware update page and flash the final version. Connect again to the “AutoConnectAP” and setup WiFi, MQTT and Led_offset again. 
-
-_Pay attention: If the device cannot connect to the provided MQTT server it blocks the firmware update page for about 25 seconds. So be patient and wait 30 seconds. After that time the device stops retrying and the firmware update page becomes available._ 
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/firmwares-1024x585.png "Firmware.bin location")
 

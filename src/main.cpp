@@ -1,18 +1,13 @@
 /*
-MQTT NeoPixel Status Multiple
+MQTT NeoPixel Status Multiple_Improved
 Written by: Alexander van der Sar
 
 website: https://www.vdsar.net/build-status-light-for-devops/
-Repository: https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple
+Repository: https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved
 3D Print design: https://www.thingiverse.com/thing:4665511
 
-Before using this code, change the update_username and update_password to secure uploading firmware through the webbrowser.
-
-To reset filesystem & wifi settings, search for below two statements and uncomment those. Flash the firmware, wait a couple of seconds 
-comment them again, flash and then your settings are reset.
-
-//LittleFS.format();
-//wifiManager.resetSettings();
+This is the improved version of the MQTT_NeoPixel_Status_Multiple. WiFiManager library is replaced with IotWebConf library
+This library keeps the configuration portal available.
 
 
 IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
@@ -20,39 +15,69 @@ pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
 and minimize distance between Arduino and first pixel.  Avoid connecting
 on a live circuit...if you must, connect GND first.
 
-BE AWARE: This version only works with ArduinoJSON library v 5.x and not with 6.x 
-
 */
-
-//#include <FS.h>                   //Replaced by LittleFS.h - this needs to be first, or it all crashes and burns...
-#include "LittleFS.h"               // LittleFS is declared
 
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
-#include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 #include <PubSubClient.h>
-
-
-#include <WiFiClient.h> //ota
-#include <ESP8266mDNS.h> //ota
-#include <ESP8266HTTPUpdateServer.h> //ota
+#include <IotWebConf.h>            // https://github.com/prampec/IotWebConf
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
 
+// -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
+const char thingName[] = "testThing";
+
+// -- Initial password to connect to the Thing, when it creates an own Access Point.
+const char wifiInitialApPassword[] = "password";
+
+#define STRING_LEN 128
+
+// -- Configuration specific key. The value should be modified if config structure was changed.
+#define CONFIG_VERSION "mqt3"
+
+// -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
+//      password to buld an AP. (E.g. in case of lost password)
+#define CONFIG_PIN D2
+
+// -- Status indicator pin.
+//      First it will light up (kept LOW), on Wifi connection it will blink,
+//      when connected to the Wifi it will turn off (kept HIGH).
+#define STATUS_PIN LED_BUILTIN
+
+// -- Callback method declarations.
+void wifiConnected();
+void configSaved();
+boolean formValidator();
+void handleRoot();
+
+DNSServer dnsServer;
+WebServer server(80);
+HTTPUpdateServer httpUpdater;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+char mqttServerValue[STRING_LEN];
+char mqttUserNameValue[STRING_LEN];
+char mqttUserPasswordValue[STRING_LEN];
+char mqttTopicValue[STRING_LEN];
+char ledOffsetValue[STRING_LEN];
+
+IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
+IotWebConfParameter mqttServerParam = IotWebConfParameter("MQTT server", "mqttServer", mqttServerValue, STRING_LEN);
+IotWebConfParameter mqttUserNameParam = IotWebConfParameter("MQTT user", "mqttUser", mqttUserNameValue, STRING_LEN);
+IotWebConfParameter mqttUserPasswordParam = IotWebConfParameter("MQTT password", "mqttPass", mqttUserPasswordValue, STRING_LEN, "password");
+IotWebConfParameter mqttTopicParam = IotWebConfParameter("MQTT Topic", "mqttTopic", mqttTopicValue, STRING_LEN);
+IotWebConfParameter ledOffsetParam = IotWebConfParameter("Led Offset", "ledOffset", ledOffsetValue, STRING_LEN);
+
 #define PIN 4 //Neo pixel data pin (GPIO4 / D2)
 #define NUMBEROFLEDS 12 //the amount of Leds on the strip
 #define blinktime 800 //milliseconds between ON/OFF while blinking
 
-//OTA Webbrowser
-const char* host = "esp8266-webupdate";
-const char* update_path = "/firmware";
-const char* update_username = "admin";
-const char* update_password = "admin";
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = Arduino pin number (most are valid)
@@ -69,37 +94,18 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBEROFLEDS, PIN, NEO_GRB + NEO_KHZ
 // and minimize distance between Arduino and first pixel.  Avoid connecting
 // on a live circuit...if you must, connect GND first.
 
-
-//flag for saving data
-bool shouldSaveConfig = false;
-
 int pixel = 0; 
 
 /*
-Limit MQTT Retries:
+Limit MQTT Retries: KAN WEG?
 When MQTT cannot connect, it will keep looping but blocks the firmware updater. 
 Limit the max_reconnects so that MQTT will stop trying and you can update the firmware to fix it
 retry is once every 5 seconds, so a max_reconnect of 5 means you have to wait 25 seconds before 
 the script responds again.
 */
-int reconnectcount = 0;
-int max_reconnect = 5; 
+//int reconnectcount = 0;
+//int max_reconnect = 5; 
 
-//define your default values here, if there are different values in config.json, they are overwritten.
-#define mqtt_server       "xxx.cloudmqtt.com"
-#define mqtt_clientname   "build_YourNameHere"
-#define mqtt_port         "1883"
-#define mqtt_user         "mqtt user"
-#define mqtt_pass         "mqtt pass"
-#define mqtt_topic        "topic/something/#" // add: /# so you automatically subscribe to subtopics!
-#define led_offset        "0"
-
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-//Webbrowser OTA
-ESP8266WebServer httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater;
 
 /* Initialize variables for light patterns (see commented code at the end)
 void colorWipe(uint32_t c, uint8_t wait);
@@ -113,11 +119,6 @@ void colorDot(uint32_t c, uint8_t wait);
 
 void callback(char* topic, byte* payload, unsigned int length);
 
-//callback notifying us of the need to save config
-void saveConfigCallback () {
-  Serial.println("Should save config");
-  shouldSaveConfig = true;
-}
 
 int ledStateArr[NUMBEROFLEDS]; //Store state of each led 
 long previous_time = 0;
@@ -125,9 +126,11 @@ long current_time = 0;
 int blink = 0;
 
 void setup() {
-  // put your setup code here, to run once:
+
   Serial.begin(115200);
   Serial.println();
+  Serial.println("Starting up...");
+
 
   //Setup Ledstrip
   strip.begin();
@@ -140,175 +143,70 @@ void setup() {
   }
   strip.show(); 
 
-  //clean FS for testing 
-  //LittleFS.format();
 
-  //read configuration from FS json
-  Serial.println("mounting FS...");
+  //iotWebConf.setStatusPin(STATUS_PIN);
+  //iotWebConf.setConfigPin(CONFIG_PIN);
+  iotWebConf.addParameter(&mqttServerParam);
+  iotWebConf.addParameter(&mqttUserNameParam);
+  iotWebConf.addParameter(&mqttUserPasswordParam);
+  iotWebConf.addParameter(&mqttTopicParam);
+  iotWebConf.addParameter(&ledOffsetParam);
+  iotWebConf.setConfigSavedCallback(&configSaved);
+  iotWebConf.setFormValidator(&formValidator);
+  iotWebConf.setWifiConnectionCallback(&wifiConnected);
+  iotWebConf.setupUpdateServer(&httpUpdater);
 
-  if (LittleFS.begin()) {
-    Serial.println("mounted file system");
-    if (LittleFS.exists("/config.json")) {
-      //file exists, reading and loading
-      Serial.println("reading config file");
-      File configFile = LittleFS.open("/config.json", "r");
-      if (configFile) {
-        Serial.println("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-          Serial.println("\nparsed json");
-          strcpy(mqtt_server, json["mqtt_server"]);
-          strcpy(mqtt_clientname, json["mqtt_clientname"]);
-          strcpy(mqtt_port, json["mqtt_port"]);
-          strcpy(mqtt_user, json["mqtt_user"]);
-          strcpy(mqtt_pass, json["mqtt_pass"]);
-          strcpy(mqtt_topic, json["mqtt_topic"]);
-          strcpy(led_offset, json["led_offset"]);
-
-        } else {
-          Serial.println("failed to load json config");
-        }
-      }
-    }
-  } else {
-    Serial.println("failed to mount FS");
-  }
-  //end read
-
-
-
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
-  WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
-  WiFiManagerParameter custom_mqtt_clientname("clientname", "mqtt clientname", mqtt_clientname, 20);
-  WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
-  WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 20);
-  WiFiManagerParameter custom_mqtt_pass("pass", "mqtt pass", mqtt_pass, 20);
-  WiFiManagerParameter custom_mqtt_topic("topic", "mqtt topic", mqtt_topic, 20);
-  WiFiManagerParameter custom_led_offset("led offset", "led offset", led_offset, 3);
-
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-
- //Reset Wifi settings for testing  
- //wifiManager.resetSettings();
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
-
-  //set static ip
-  //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-  
-  //add all your parameters here
-  wifiManager.addParameter(&custom_mqtt_server);
-  wifiManager.addParameter(&custom_mqtt_clientname);
-  wifiManager.addParameter(&custom_mqtt_port);
-  wifiManager.addParameter(&custom_mqtt_user);
-  wifiManager.addParameter(&custom_mqtt_pass);
-  wifiManager.addParameter(&custom_mqtt_topic);
-  wifiManager.addParameter(&custom_led_offset);
-
-
-  //set minimum quality of signal so it ignores AP's under that quality
-  //defaults to 8%
-  //wifiManager.setMinimumSignalQuality();
-  
-  //sets timeout until configuration portal gets turned off
-  //useful to make it all retry or go to sleep
-  //in seconds
-  //wifiManager.setTimeout(120);
-
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
-  if (!wifiManager.autoConnect("AutoConnectAP", "password")) {
-    Serial.println("failed to connect and hit timeout");
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();
-    delay(5000);
+  // -- Initializing the configuration.
+  boolean validConfig = iotWebConf.init();
+  if (!validConfig)
+  {
+    mqttServerValue[0] = '\0';
+    mqttUserNameValue[0] = '\0';
+    mqttUserPasswordValue[0] = '\0';
+    mqttTopicValue[0] ='\0';
+    ledOffsetValue[0] = '\0';
   }
 
-  //if you get here you have connected to the WiFi
-  Serial.println("WiFi connected...yeey :)");
-
-  //read updated parameters
-  strcpy(mqtt_server, custom_mqtt_server.getValue());
-  strcpy(mqtt_clientname, custom_mqtt_clientname.getValue());
-  strcpy(mqtt_port, custom_mqtt_port.getValue());
-  strcpy(mqtt_user, custom_mqtt_user.getValue());
-  strcpy(mqtt_pass, custom_mqtt_pass.getValue());
-  strcpy(mqtt_topic, custom_mqtt_topic.getValue());
-  strcpy(led_offset, custom_led_offset.getValue());
-
-
-  //save the custom parameters to FS
-  if (shouldSaveConfig) {
-    Serial.println("saving config");
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
-    json["mqtt_server"] = mqtt_server;
-    json["mqtt_clientname"]= mqtt_clientname;
-    json["mqtt_port"] = mqtt_port;
-    json["mqtt_user"] = mqtt_user;
-    json["mqtt_pass"] = mqtt_pass;
-    json["mqtt_topic"] = mqtt_topic;
-    json["led_offset"] = led_offset;
-
-
-    File configFile = LittleFS.open("/config.json", "w");
-    if (!configFile) {
-      Serial.println("failed to open config file for writing");
-    }
-
-    json.printTo(Serial);
-    json.printTo(configFile);
-    configFile.close();
-    //end save
-  }
+  // -- Set up required URL handlers on the web server.
+  server.on("/", handleRoot);
+  server.on("/config", []{ iotWebConf.handleConfig(); });
+  server.onNotFound([](){ iotWebConf.handleNotFound(); });
 
   Serial.println("local ip");
   Serial.println(WiFi.localIP());
 
-//Webbrowser OTA
-  MDNS.begin(host);
-  httpUpdater.setup(&httpServer, update_path, update_username, update_password);
-  httpServer.begin();
-  MDNS.addService("http", "tcp", 80);
-  Serial.printf("HTTPUpdateServer ready! Open http://%s.local%s in your browser\n", host,update_path);
-
   //Set MQTT Server and port 
-  client.setServer(mqtt_server, atoi(mqtt_port));
+  client.setServer(mqttServerValue, 1883);
   client.setCallback(callback);
 
-  //Handle led_offset
-  pixel = 0 + atoi(led_offset);
+  /*
+  Handle led_offset
+  Set all leds to blue, next make the original first led to Red and then set the 
+  led with offset to green
+  */
+  for(pixel =0;pixel < NUMBEROFLEDS;pixel++)
+      strip.setPixelColor(pixel,strip.Color(0 ,0, 255)); //Set all leds to Blue
+  strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the offical first led to Red.
+
+  pixel = 0 + atoi(ledOffsetValue);
   if(pixel > (NUMBEROFLEDS-1)){
     pixel = pixel - NUMBEROFLEDS;
   }  
   strip.setPixelColor(pixel,strip.Color(0 ,255, 0)); //Set the first led with offset to Green. Ready to go.
-  strip.show(); // Initialize all pixels to 'off'
-
+  strip.show(); 
 
 delay(5000); // so you have time to check if the green led is at the right spot.
 
 } //end of setup function
 
-//MQTT Callback function
+/*
+MQTT Callback function
+Determine Topic number and store the payload in ledStateArr (Array)
+*/
 void callback(char* topic, byte* payload, unsigned int length) {
- // Serial.print("Message arrived [");
- // Serial.print(topic);
- // Serial.print("] ");
+  //Serial.print("Message arrived [");
+  //Serial.print(topic);
+  //Serial.print("] ");
 
   int LedId = 0;
 
@@ -384,23 +282,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void reconnect() {
   // Loop until we're reconnected
-  while (!client.connected() && reconnectcount < max_reconnect) { //stop trying after max_reconnect attempts to stop blocking the script.
+  while ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && !client.connected()) { //stop trying after max_reconnect attempts to stop blocking the script.
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     // If you do not want to use a username and password, change next line to
     // if (client.connect("ESP8266Client")) {
-    if (client.connect(mqtt_clientname, mqtt_user, mqtt_pass)) { //mqtt_user, mqtt_pass
+    if (client.connect("TIJDELIJK", mqttUserNameValue, mqttUserPasswordValue)) { //mqtt_user, mqtt_pass
       Serial.println("connected");
-      Serial.println(mqtt_topic);
-      client.subscribe(mqtt_topic); //subscribe to topic
-      reconnectcount = 0; //reset the reconnectcounter
+      Serial.println(mqttTopicValue);
+      client.subscribe(mqttTopicValue); //subscribe to topic
     } 
     else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      reconnectcount++;
       delay(5000);
     }
 
@@ -414,10 +310,7 @@ long lastMsg = 0;
 
 void loop() {
   // put your main code here, to run repeatedly:
-
-  //Webbrowser OTA
-  httpServer.handleClient(); 
-  MDNS.update(); 
+  iotWebConf.doLoop();
 
  /*
   DRIVE THE LEDS
@@ -434,7 +327,7 @@ void loop() {
       client.loop(); //make sure MQTT Keeps running (hopefully prevents watchdog from kicking in)
 
         //Handle led_offset
-        pixel = x + atoi(led_offset);
+        pixel = x + atoi(ledOffsetValue);
         if(pixel > (NUMBEROFLEDS-1)){
             pixel = pixel - NUMBEROFLEDS;
         }
@@ -518,14 +411,74 @@ strip.show(); //set all pixels
   client.loop();
   delay(10);
 
+/* 
+// Publish 'ONLINE' Message to Topic. Uncomment if you want to use this.
   long now = millis();
   if (now - lastMsg > 10000) {
     lastMsg = now;
- // client.publish("build/test", "ONLINE"); //publish 'ONLINE' message to topic.
-
+  client.publish("build/test", "ONLINE"); //publish 'ONLINE' message to topic.
   }
+  */
 }
 
+
+/**
+ * Handle web requests to "/" path.
+ */
+void handleRoot()
+{
+  // -- Let IotWebConf test and handle captive portal requests.
+  if (iotWebConf.handleCaptivePortal())
+  {
+    // -- Captive portal request were already served.
+    return;
+  }
+  String s = "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>";
+  s += "<title>MQTT NeoPixel Status Light</title></head><body>MQTT NeoPixel Status Light";
+  s += "<ul>";
+  s += "<li>MQTT server: ";
+  s += mqttServerValue;
+  s += "</ul>";
+  s += "<ul>";
+  s += "<li>MQTT Topic: ";
+  s += mqttTopicValue;
+  s += "</ul>";
+  s += "<ul>";
+  s += "<li>LED Offset: ";
+  s += ledOffsetValue;
+  s += "</ul>";
+  s += "Go to <a href='config'>configure page</a> to change values and update firmware.<p>";
+  s += "Check out latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.";
+  s += "</body></html>\n";
+
+  server.send(200, "text/html", s);
+}
+
+void wifiConnected()
+{
+  //needMqttConnect = true;
+}
+
+void configSaved()
+{
+  Serial.println("Configuration was updated.");
+  //needReset = true;
+}
+
+boolean formValidator()
+{
+  Serial.println("Validating form.");
+  boolean valid = true;
+
+  int l = server.arg(mqttServerParam.getId()).length();
+  if (l < 3)
+  {
+    mqttServerParam.errorMessage = "Please provide at least 3 characters!";
+    valid = false;
+  }
+
+  return valid;
+}
 
 
 //  Some example procedures showing how to display to the pixels:
