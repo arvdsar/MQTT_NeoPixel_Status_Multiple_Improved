@@ -47,7 +47,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx1"
+#define CONFIG_VERSION "npx2"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -445,7 +445,7 @@ void handleRoot()
 
   String s = F("<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>");
   s += iotWebConf.getHtmlFormatProvider()->getStyle();
-  s += "<title>MQTT NeoPixel Status Light</title></head><style><body>";
+  s += "<title>MQTT NeoPixel Status Light</title></head><body>";
   s += "<H1>";
   s += iotWebConf.getThingName();
   s+= "</H1>";
@@ -466,9 +466,9 @@ void handleRoot()
   s += "</div>";
   s += "<button type='button' onclick=\"location.href='';\" >Refresh</button>";
   s += "<div>Go to <a href='config'>configure page</a> to change values.</div>";
-  s +="<p><div><small>MQTT NeoPixel Status Multiple - Version: ";
+  s +="<div><small>MQTT NeoPixel Status Multiple - Version: ";
   s += VERSIONNUMBER;
-  s += " - Get latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.</div>";
+  s += " - Get latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.";
   s += "</small></div>";
 
   s += "</body></html>\n";
