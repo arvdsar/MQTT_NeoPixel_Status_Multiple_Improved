@@ -15,6 +15,7 @@
     - [4.1. MQTT Topic](#41-mqtt-topic)
     - [4.2. MQTT Payload](#42-mqtt-payload)
     - [4.3. NodeRed](#43-nodered)
+- [5. Versioning](#5-versioning)
 
 <!-- /TOC -->
 
