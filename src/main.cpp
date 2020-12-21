@@ -17,7 +17,9 @@ and minimize distance between Arduino and first pixel.  Avoid connecting
 on a live circuit...if you must, connect GND first.
 
 */
-#include <version.h>
+
+#define VERSIONNUMBER "v1.0 - 21-12-2020"
+
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -465,7 +467,7 @@ void handleRoot()
   s += "<button type='button' onclick=\"location.href='';\" >Refresh</button>";
   s += "<div>Go to <a href='config'>configure page</a> to change values.</div>";
   s +="<p><div><small>MQTT NeoPixel Status Multiple - Version: ";
-  s += VERSION_SHORT;
+  s += VERSIONNUMBER;
   s += " - Get latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.</div>";
   s += "</small></div>";
 
