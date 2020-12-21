@@ -74,6 +74,11 @@ Never used PlatformIO? Check this page: [PlatformIO - How to flash firmware](htt
 Power on the device and connect your laptop to the wireless access point `"NeoPxLight"` with password `"password"`. Now visit 192.168.4.1 where you can configure the device.
 Be aware that you have to disconnect from this accesspoint before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to `"NeoPxLight"` if you need to.
 
+The field `AP password` sets you password when you want to access the configuration portal. For what I have experience now, it does not change the default password of the accesspoint of the device. Do not forget this password! If you need to reset it, you have to use wires!
+
+![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/SetAPPassword.png "Demo of original position vs offset position")
+
+
 ### 3.2.1. WiFi & MQTT ###
 Setup the WiFi by typing your SSID and provide your MQTT details. As topic you use something like: `some/thing/#` (read more below). 
 A unique MQTT ClientID is created based on the ChipID. 
