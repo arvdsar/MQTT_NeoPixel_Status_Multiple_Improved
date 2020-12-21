@@ -17,7 +17,7 @@ and minimize distance between Arduino and first pixel.  Avoid connecting
 on a live circuit...if you must, connect GND first.
 
 */
-
+#include <version.h>
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -443,12 +443,15 @@ void handleRoot()
 
   String s = F("<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>");
   s += iotWebConf.getHtmlFormatProvider()->getStyle();
-  s += "<title>MQTT NeoPixel Status Light</title></head><body>";
+  s += "<title>MQTT NeoPixel Status Light</title></head><style><body>";
   s += "<H1>";
   s += iotWebConf.getThingName();
   s+= "</H1>";
   s += "<div>MQTT ClientId: ";
   s += mqttClientId;
+  s += "</div>";
+  s += "<div>MAC address: ";
+  s += WiFi.macAddress();
   s += "</div>";
   s += "<div>MQTT Server: ";
   s += mqttServerValue;
@@ -461,7 +464,10 @@ void handleRoot()
   s += "</div>";
   s += "<button type='button' onclick=\"location.href='';\" >Refresh</button>";
   s += "<div>Go to <a href='config'>configure page</a> to change values.</div>";
-  s += "<div>Check out latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.</div>";
+  s +="<p><div><small>MQTT NeoPixel Status Multiple - Version: ";
+  s += VERSION_SHORT;
+  s += " - Get latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.</div>";
+  s += "</small></div>";
 
   s += "</body></html>\n";
   server.send(200, "text/html", s);
@@ -475,12 +481,10 @@ void wifiConnected()
 void configSaved()
 {
   Serial.println("Configuration was updated.");
-  
-  Serial.println(WiFi.macAddress());
   showLedOffset(); //Show real LED1 and your Led 1 at offset so you can check the offset
   delay(5000);
   inConfig = 0; // Enable Led Pattern again
-  //needReset = true; 
+  needReset = true; 
 }
 
 boolean formValidator()
