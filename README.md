@@ -15,7 +15,6 @@
     - [4.1. MQTT Topic](#41-mqtt-topic)
     - [4.2. MQTT Payload](#42-mqtt-payload)
     - [4.3. NodeRed](#43-nodered)
-- [5. Versioning](#5-versioning)
 
 <!-- /TOC -->
 
@@ -135,11 +134,3 @@ You can choose to have a static LED or blinking LED.
 
 ## 4.3. NodeRed ##
 I use [NodeRed](https://nodered.org) to listen to all kind of statusses of Domotica or IoT sensors and then act upon that status by sending MQTT Messages to the device. 
-
-
-# 5. Versioning #
-I used a modified version of [buildScript Versioning](https://gitlab.com/pvojnisek/buildnumber-for-platformio/tree/master) script for PlatformIO to automatically keep track of the build numbers. This script is included in the repository. The script is in the project folder and added to the platformio.ini file to be ran before building.The version numbers are in include/version.h
-version.h is included in main.cpp and the version number is displayed on the config page. 
-The version number includes the type of Board for which it is build.
-
-If anytime you need to increment the main version, you do it in the buildscript_versioning.py file.
