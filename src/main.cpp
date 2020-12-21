@@ -1,5 +1,5 @@
 /*
-MQTT NeoPixel Status Multiple_Improved
+MQTT NeoPixel Status Multiple Improved
 Written by: Alexander van der Sar
 
 website: https://www.vdsar.net/build-status-light-for-devops/
@@ -7,7 +7,8 @@ Repository: https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved
 3D Print design: https://www.thingiverse.com/thing:4665511
 
 This is the improved version of the MQTT_NeoPixel_Status_Multiple. WiFiManager library is replaced with IotWebConf library
-This library keeps the configuration portal available.
+This library keeps the configuration portal available so you don't have to reflash to change settings.
+It depends on IoTWebConf Libary v3.0.0 (not compatible with 2.x)
 
 
 IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
@@ -17,11 +18,17 @@ on a live circuit...if you must, connect GND first.
 
 */
 
-#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+#include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <PubSubClient.h>
-#include <IotWebConf.h>            // https://github.com/prampec/IotWebConf
+#include <IotWebConf.h>         // https://github.com/prampec/IotWebConf
+#include <IotWebConfUsing.h>    // This loads aliases for easier class names.
+#ifdef ESP8266
+# include <ESP8266HTTPUpdateServer.h>
+#elif defined(ESP32)
+# include <IotWebConfESP32HTTPUpdateServer.h>
+#endif
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
@@ -29,19 +36,20 @@ on a live circuit...if you must, connect GND first.
 #endif
 
 // -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
-const char thingName[] = "testThing";
+// -- Keep it under 16 characters to handle MQTT compatiblity (thingName+ChipID = unique mqttClientID)
+const char thingName[] = "NeoPxLight";
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "password";
 
 #define STRING_LEN 128
-
+#define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "mqt3"
+#define CONFIG_VERSION "npx1"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
-#define CONFIG_PIN D2
+//#define CONFIG_PIN D3
 
 // -- Status indicator pin.
 //      First it will light up (kept LOW), on Wifi connection it will blink,
@@ -53,26 +61,34 @@ void wifiConnected();
 void configSaved();
 boolean formValidator();
 void handleRoot();
+void showLedOffset();
+void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 DNSServer dnsServer;
 WebServer server(80);
+#ifdef ESP8266
+ESP8266HTTPUpdateServer httpUpdater;
+#elif defined(ESP32)
 HTTPUpdateServer httpUpdater;
+#endif
 
 WiFiClient espClient;
-PubSubClient client(espClient);
+PubSubClient client(espClient); //MQTT
 
 char mqttServerValue[STRING_LEN];
 char mqttUserNameValue[STRING_LEN];
 char mqttUserPasswordValue[STRING_LEN];
 char mqttTopicValue[STRING_LEN];
-char ledOffsetValue[STRING_LEN];
+char ledOffsetValue[NUMBER_LEN];
+char mqttClientId[STRING_LEN];
+
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
-IotWebConfParameter mqttServerParam = IotWebConfParameter("MQTT server", "mqttServer", mqttServerValue, STRING_LEN);
-IotWebConfParameter mqttUserNameParam = IotWebConfParameter("MQTT user", "mqttUser", mqttUserNameValue, STRING_LEN);
-IotWebConfParameter mqttUserPasswordParam = IotWebConfParameter("MQTT password", "mqttPass", mqttUserPasswordValue, STRING_LEN, "password");
-IotWebConfParameter mqttTopicParam = IotWebConfParameter("MQTT Topic", "mqttTopic", mqttTopicValue, STRING_LEN);
-IotWebConfParameter ledOffsetParam = IotWebConfParameter("Led Offset", "ledOffset", ledOffsetValue, STRING_LEN);
+IotWebConfTextParameter mqttServerParam = IotWebConfTextParameter("MQTT server", "mqttServer", mqttServerValue, STRING_LEN);
+IotWebConfTextParameter mqttUserNameParam = IotWebConfTextParameter("MQTT user", "mqttUser", mqttUserNameValue, STRING_LEN);
+IotWebConfPasswordParameter mqttUserPasswordParam = IotWebConfPasswordParameter("MQTT password", "mqttPass", mqttUserPasswordValue, STRING_LEN);
+IotWebConfTextParameter mqttTopicParam = IotWebConfTextParameter("MQTT Topic", "mqttTopic", mqttTopicValue, STRING_LEN,NULL,"some/thing/#");
+IotWebConfNumberParameter ledOffsetParam = IotWebConfNumberParameter("Led Offset", "ledOffset", ledOffsetValue, NUMBER_LEN, "0");
 
 #define PIN 4 //Neo pixel data pin (GPIO4 / D2)
 #define NUMBEROFLEDS 12 //the amount of Leds on the strip
@@ -94,37 +110,18 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBEROFLEDS, PIN, NEO_GRB + NEO_KHZ
 // and minimize distance between Arduino and first pixel.  Avoid connecting
 // on a live circuit...if you must, connect GND first.
 
-int pixel = 0; 
-
-/*
-Limit MQTT Retries: KAN WEG?
-When MQTT cannot connect, it will keep looping but blocks the firmware updater. 
-Limit the max_reconnects so that MQTT will stop trying and you can update the firmware to fix it
-retry is once every 5 seconds, so a max_reconnect of 5 means you have to wait 25 seconds before 
-the script responds again.
-*/
-//int reconnectcount = 0;
-//int max_reconnect = 5; 
-
-
-/* Initialize variables for light patterns (see commented code at the end)
-void colorWipe(uint32_t c, uint8_t wait);
-void rainbow(uint8_t wait);
-void rainbowCycle(uint8_t wait);
-void theaterChase(uint32_t c, uint8_t wait);
-void theaterChaseRainbow(uint8_t wait);
-uint32_t Wheel(byte WheelPos);
-void colorDot(uint32_t c, uint8_t wait);
-*/
-
-void callback(char* topic, byte* payload, unsigned int length);
-
+int pixel = 0;      //Indicate which Pixel to light
+bool inConfig = 0;  //Indicator if you are on config portal or not (for blocking Led Pattern)
+long lastMsg = 0;   //timestamp of last MQTT Publish
 
 int ledStateArr[NUMBEROFLEDS]; //Store state of each led 
 long previous_time = 0;
 long current_time = 0;
-int blink = 0;
+int blink = 0;           //to keep track of blinking status (on or off)
+bool needReset = false;
 
+
+//***************************** SETUP ***************************************************
 void setup() {
 
   Serial.begin(115200);
@@ -144,17 +141,22 @@ void setup() {
   strip.show(); 
 
 
-  //iotWebConf.setStatusPin(STATUS_PIN);
+  iotWebConf.setStatusPin(STATUS_PIN);
   //iotWebConf.setConfigPin(CONFIG_PIN);
-  iotWebConf.addParameter(&mqttServerParam);
-  iotWebConf.addParameter(&mqttUserNameParam);
-  iotWebConf.addParameter(&mqttUserPasswordParam);
-  iotWebConf.addParameter(&mqttTopicParam);
-  iotWebConf.addParameter(&ledOffsetParam);
+  iotWebConf.addSystemParameter(&mqttServerParam);
+  iotWebConf.addSystemParameter(&mqttUserNameParam);
+  iotWebConf.addSystemParameter(&mqttUserPasswordParam);
+  iotWebConf.addSystemParameter(&mqttTopicParam);
+  iotWebConf.addSystemParameter(&ledOffsetParam);
   iotWebConf.setConfigSavedCallback(&configSaved);
   iotWebConf.setFormValidator(&formValidator);
+  iotWebConf.getApTimeoutParameter()->visible = false; //set to true if you want to specify the timeout in portal
+
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
-  iotWebConf.setupUpdateServer(&httpUpdater);
+  //iotWebConf.setupUpdateServer(&httpUpdater);
+  iotWebConf.setupUpdateServer(
+    [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
+    [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
 
   // -- Initializing the configuration.
   boolean validConfig = iotWebConf.init();
@@ -177,33 +179,28 @@ void setup() {
 
   //Set MQTT Server and port 
   client.setServer(mqttServerValue, 1883);
-  client.setCallback(callback);
+  client.setCallback(mqttCallback);
 
-  /*
-  Handle led_offset
-  Set all leds to blue, next make the original first led to Red and then set the 
-  led with offset to green
-  */
-  for(pixel =0;pixel < NUMBEROFLEDS;pixel++)
-      strip.setPixelColor(pixel,strip.Color(0 ,0, 255)); //Set all leds to Blue
-  strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the offical first led to Red.
+  showLedOffset(); //Display real Led 1 and the Led 1 after offset
+  delay(5000); // so you have time to check if the green led is at the right spot.
 
-  pixel = 0 + atoi(ledOffsetValue);
-  if(pixel > (NUMBEROFLEDS-1)){
-    pixel = pixel - NUMBEROFLEDS;
-  }  
-  strip.setPixelColor(pixel,strip.Color(0 ,255, 0)); //Set the first led with offset to Green. Ready to go.
-  strip.show(); 
+  //add random string to mqttClientId to make it Unique
+   //mqttClientId += String(ESP.getChipId(), HEX); //ChipId seems to be part of Mac Address 
 
-delay(5000); // so you have time to check if the green led is at the right spot.
+//Create UNIQUE MQTT ClientId - When not unique on the same MQTT server, you'll get strange behaviour
+//It uses the unique chipID of the ESP.
+sprintf(mqttClientId, "%s%u", thingName,ESP.getChipId()); 
+Serial.print("mqttclientid: ");
+Serial.println(mqttClientId);
+}
+//************************ END OF SETUP ********************************************
 
-} //end of setup function
 
 /*
 MQTT Callback function
 Determine Topic number and store the payload in ledStateArr (Array)
 */
-void callback(char* topic, byte* payload, unsigned int length) {
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
   //Serial.print("Message arrived [");
   //Serial.print(topic);
   //Serial.print("] ");
@@ -277,17 +274,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
           ledStateArr[LedId] = 0; 
   }
 }
-
+//**************** END OF MQTT CALLBACK FUNCTION *********************************
 
 
 void reconnect() {
   // Loop until we're reconnected
-  while ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && !client.connected()) { //stop trying after max_reconnect attempts to stop blocking the script.
+  while ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && !client.connected()) { 
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     // If you do not want to use a username and password, change next line to
     // if (client.connect("ESP8266Client")) {
-    if (client.connect("TIJDELIJK", mqttUserNameValue, mqttUserPasswordValue)) { //mqtt_user, mqtt_pass
+    if (client.connect(mqttClientId, mqttUserNameValue, mqttUserPasswordValue)) { //mqtt_user, mqtt_pass
       Serial.println("connected");
       Serial.println(mqttTopicValue);
       client.subscribe(mqttTopicValue); //subscribe to topic
@@ -304,13 +301,13 @@ void reconnect() {
   }
 }
 
-
-long lastMsg = 0;
-
+//******************** START OF LOOP () *****************************************************
 
 void loop() {
-  // put your main code here, to run repeatedly:
+
   iotWebConf.doLoop();
+  client.loop(); //make sure MQTT Keeps running (hopefully prevents watchdog from kicking in)
+  delay(10);
 
  /*
   DRIVE THE LEDS
@@ -322,7 +319,6 @@ void loop() {
   orange - orangeblink (11 / 12)
   off (0)
   */
-
  for (int x=0;x<NUMBEROFLEDS;x++){ //loop through all leds and set the required color (R,G,B)
       client.loop(); //make sure MQTT Keeps running (hopefully prevents watchdog from kicking in)
 
@@ -393,7 +389,9 @@ void loop() {
 
   } //end for-loop
 
-strip.show(); //set all pixels  
+//Block updating the LEDs while in Configuration portal (inConfig)
+if(inConfig == 0) 
+  strip.show(); //set all pixels  
  
  //Handle blinking of leds by switching blink value every x-milliseconds (blinktime)
  current_time = millis();
@@ -411,6 +409,12 @@ strip.show(); //set all pixels
   client.loop();
   delay(10);
 
+  if (needReset)
+  {
+    Serial.println("Rebooting after 1 second.");
+    iotWebConf.delay(1000);
+    ESP.restart();
+  }
 /* 
 // Publish 'ONLINE' Message to Topic. Uncomment if you want to use this.
   long now = millis();
@@ -420,6 +424,7 @@ strip.show(); //set all pixels
   }
   */
 }
+//******************** END OF LOOP () *****************************************
 
 
 /**
@@ -433,36 +438,49 @@ void handleRoot()
     // -- Captive portal request were already served.
     return;
   }
-  String s = "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>";
-  s += "<title>MQTT NeoPixel Status Light</title></head><body>MQTT NeoPixel Status Light";
-  s += "<ul>";
-  s += "<li>MQTT server: ";
-  s += mqttServerValue;
-  s += "</ul>";
-  s += "<ul>";
-  s += "<li>MQTT Topic: ";
-  s += mqttTopicValue;
-  s += "</ul>";
-  s += "<ul>";
-  s += "<li>LED Offset: ";
-  s += ledOffsetValue;
-  s += "</ul>";
-  s += "Go to <a href='config'>configure page</a> to change values and update firmware.<p>";
-  s += "Check out latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.";
-  s += "</body></html>\n";
+  inConfig = 1; //You are in the Config Portal
+  showLedOffset(); //Show real LED1 and your Led 1 at offset
 
+  String s = F("<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\"/>");
+  s += iotWebConf.getHtmlFormatProvider()->getStyle();
+  s += "<title>MQTT NeoPixel Status Light</title></head><body>";
+  s += "<H1>";
+  s += iotWebConf.getThingName();
+  s+= "</H1>";
+  s += "<div>MQTT ClientId: ";
+  s += mqttClientId;
+  s += "</div>";
+  s += "<div>MQTT Server: ";
+  s += mqttServerValue;
+  s += "</div>";
+  s += "<div>MQTT Topic: ";
+  s += mqttTopicValue;
+  s += "</div>";
+  s += "<div>LED Offset: ";
+  s += ledOffsetValue;
+  s += "</div>";
+  s += "<button type='button' onclick=\"location.href='';\" >Refresh</button>";
+  s += "<div>Go to <a href='config'>configure page</a> to change values.</div>";
+  s += "<div>Check out latest version on <a href='https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved' target='_blank'>Github</a>.</div>";
+
+  s += "</body></html>\n";
   server.send(200, "text/html", s);
 }
 
 void wifiConnected()
 {
-  //needMqttConnect = true;
+  //needMqttConnect = true; //not using this.
 }
 
 void configSaved()
 {
   Serial.println("Configuration was updated.");
-  //needReset = true;
+  
+  Serial.println(WiFi.macAddress());
+  showLedOffset(); //Show real LED1 and your Led 1 at offset so you can check the offset
+  delay(5000);
+  inConfig = 0; // Enable Led Pattern again
+  //needReset = true; 
 }
 
 boolean formValidator()
@@ -481,123 +499,27 @@ boolean formValidator()
 }
 
 
-//  Some example procedures showing how to display to the pixels:
-
 /*
- colorWipe(strip.Color(255, 0, 0), 100); // Red
- colorDot(strip.Color(255,255,0),500);
- colorWipe(strip.Color(0, 255, 0), 100); // Green
- colorWipe(strip.Color(0, 0, 255), 100); // Blue
- colorWipe(strip.Color(0, 0, 0, 255), 50); // White RGBW
- Send a theater pixel chase in...
- theaterChase(strip.Color(127, 127, 127), 100); // White
- theaterChase(strip.Color(0, 0, 127), 200); // Red
- theaterChase(strip.Color(0, 0, 127), 100); // Blue
-
- rainbow(20);
- rainbowCycle(20);
- theaterChaseRainbow(50);
- */
-
-/* 
-//Some functions with light effects for possible future use.
-
-//All kind of functions for the neopixels
-// Fill the dots one after the other with a color
-void colorDot(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.setPixelColor(i-1,strip.Color(0,0,0));
-    strip.show();
-    delay(wait);
-  }
-
-}
-
-
-// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
-  }
-}
-
-void rainbow(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
-    }
-    strip.show();
-    delay(wait);
-  }
-}
-
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-    }
-    strip.show();
-    delay(wait);
-  }
-}
-
-//Theatre-style crawling lights.
-void theaterChase(uint32_t c, uint8_t wait) {
-  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, c);    //turn every third pixel on
-      }
-      strip.show();
-
-      delay(wait);
-
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, strip.Color(0,0,0));        //turn every third pixel off
-      }
-    }
-  }
-}
-
-//Theatre-style crawling lights with rainbow effect
-void theaterChaseRainbow(uint8_t wait) {
-  for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, Wheel( (i+j) % 255));    //turn every third pixel on
-      }
-      strip.show();
-
-      delay(wait);
-
-      for (uint16_t i=0; i < strip.numPixels(); i=i+3) {
-        strip.setPixelColor(i+q, 0);        //turn every third pixel off
-      }
-    }
-  }
-}
-
-
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if(WheelPos < 170) {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
+ Handle led_offset
+ Set all leds to blue, next make the original first led Red and then set the 
+ led with offset to green. The Green Led should be where YOU want to see LED 1.
 */
+void showLedOffset(){
+
+  for(pixel =0;pixel < NUMBEROFLEDS;pixel++)
+      strip.setPixelColor(pixel,strip.Color(0 ,0, 255)); //Set all leds to Blue
+  strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the offical first led to Red.
+
+  pixel = 0 + atoi(ledOffsetValue);
+  if(pixel > (NUMBEROFLEDS-1)){
+    pixel = pixel - NUMBEROFLEDS;
+  }  
+  strip.setPixelColor(pixel,strip.Color(0 ,255, 0)); //Set the first led with offset to Green. Ready to go.
+  strip.show(); 
+
+}
+
+
+
+
+

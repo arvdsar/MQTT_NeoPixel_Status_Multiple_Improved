@@ -32,9 +32,9 @@ You could use it to indicate the build status of a CI/CD build pipeline.
 
 Flash an updated firmware or change configuration using your browser.
 
+This version requires the just released IotWebConf Library v3.x (incompatible with v2.x)
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/IMG_3071-1.jpeg "Build Status Light")
-
 
 
 # 2. Hardware #
@@ -71,27 +71,27 @@ The platformio.ini is setup for both Wemos D1-MINI (4Mb) and D1-MINI-PRO (16Mb).
 Never used PlatformIO? Check this page: [PlatformIO - How to flash firmware](https://www.vdsar.net/platformio-flash-firmware)
 
 ## 3.2. Initial setup of the device ##
-Power on the device and connect your laptop to the wireless access point “AutoConnectAP” with password "password". Now visit 192.168.4.1 where you can configure the device.
-Be aware that you have to disconnect from this accesspoint before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to "AutoConnectAP" if you need to.
+Power on the device and connect your laptop to the wireless access point `"NeoPxLight"` with password `"password"`. Now visit 192.168.4.1 where you can configure the device.
+Be aware that you have to disconnect from this accesspoint before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to `"NeoPxLight"` if you need to.
 
 ### 3.2.1. WiFi & MQTT ###
-Setup the WiFi by manually typing the SSID and provide your MQTT details. As topic you use something like: `some/thing/#` (read more below). 
-Be aware to use a unique ClientID otherwise you'll get connection errors and weird behavior. Be aware of case sensitive usernames and passwords and your computer auto correction. :-)
+Setup the WiFi by typing your SSID and provide your MQTT details. As topic you use something like: `some/thing/#` (read more below). 
+A unique MQTT ClientID is created based on the ChipID. 
+Be aware of case sensitive usernames and passwords and auto correction messing this up :-)
 
 ### 3.2.2. Led offset ###
-You can also provide a led offset. This is to align the first led to the position where you want to see the first led. At start of the device the 'real' first LED is red. Now count how many LEDs (clockwise) further you want to position the first LED and enter that value as the offset. After succesful boot of the device and connected to WiFi you will see the 'moved' LED 1 in green for 5 seconds. 
+To align the first led to the position where you want to see the first led, you can provide the led offset. While you are connected to the configuration page, the device shows the 'real' first LED in red (or green when offset = 0). Now count how many LEDs (clockwise) further you want to position the first LED and enter that value as the offset. After applying the settings you will see the Green LED indicating what will be used as LED 1 for 5 seconds. 
+_As long as you have the configuration page open this green and red led will be displayed. Close the webpage (and reset the device) to get it running.
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/ledoffset.jpg "Demo of original position vs offset position")
 
 ## 3.3. Change configuration ##
-Browse to the IP of your device and it will show the current setting and a link to the configuration page. 
-
+Browse to the IP of your device and it will show the current setting and a link to the configuration page. Once you visit this page it will show the Led offset indicator.
 
 ## 3.4. OTA Firmware update ##
-As long as your device can connect to WiFi you can update the firmware via your webbrowser. Visit http://ip-address/firmware or http://esp8266-webupdate.local/firmware and you can upload a firmware file. The default user/password is admin/admin (change it in the code to make it more secure).
+You can update the firmware from the configuration webpage. 
 
-When you 'Build' the application in PlatformIO, you can find the firmware.bin file in a hidden directory .pio in your project folder (/MQTT_NeoPixel_Status_Multiple/.pio/build/d1_mini/). Build one with and without the LittleFS.format() and wifiManager.resetSettings(); uncommented so you can easily reset settings by flashing via the browser.
-
+When you 'Build' the application in PlatformIO, you can find the firmware.bin file in a hidden directory .pio in your project folder (/MQTT_NeoPixel_Status_Multiple/.pio/build/d1_mini/). 
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/firmwares-1024x585.png "Firmware.bin location")
 
