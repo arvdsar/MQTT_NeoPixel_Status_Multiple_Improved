@@ -27,6 +27,8 @@ Github Repository: [MQTT_NeoPixel_Status_Multiple_Improved ](https://github.com/
 
 Website: [https://www.vdsar.net/build-status-light-for-devops/](https://www.vdsar.net/build-status-light-for-devops/)
 
+Download: [Prebuild firmware binaries](https://vdsar.net/firmware/MQTT%20NeoPixel%20Build%20Light/)
+
 Control each individual LED of a NeoPixel LedRing (or ledstrip) by publishing a color 'green, red, yellow, etc' to a specific MQTT Topic per Led.
 
 You could use it to indicate the build status of a CI/CD build pipeline.
