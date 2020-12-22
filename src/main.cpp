@@ -17,7 +17,7 @@ on a live circuit...if you must, connect GND first.
 
 */
 
-#define VERSIONNUMBER "v1.0.1 - 22-12-2020"
+#define VERSIONNUMBER "v1.1 - 22-12-2020"
 
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
@@ -46,7 +46,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx1"
+#define CONFIG_VERSION "npx3"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -81,8 +81,9 @@ char mqttUserNameValue[STRING_LEN];
 char mqttUserPasswordValue[STRING_LEN];
 char mqttTopicValue[STRING_LEN];
 char ledOffsetValue[NUMBER_LEN];
-char mqttClientId[STRING_LEN];
+char ledBrightnessValue[NUMBER_LEN];
 
+char mqttClientId[STRING_LEN]; //automatically created. not via config!
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 IotWebConfTextParameter mqttServerParam = IotWebConfTextParameter("MQTT server", "mqttServer", mqttServerValue, STRING_LEN);
@@ -90,6 +91,11 @@ IotWebConfTextParameter mqttUserNameParam = IotWebConfTextParameter("MQTT user",
 IotWebConfPasswordParameter mqttUserPasswordParam = IotWebConfPasswordParameter("MQTT password", "mqttPass", mqttUserPasswordValue, STRING_LEN);
 IotWebConfTextParameter mqttTopicParam = IotWebConfTextParameter("MQTT Topic", "mqttTopic", mqttTopicValue, STRING_LEN,NULL,"some/thing/#");
 IotWebConfNumberParameter ledOffsetParam = IotWebConfNumberParameter("Led Offset", "ledOffset", ledOffsetValue, NUMBER_LEN, "0");
+
+//LedBrightness: 255 is the max brightness. It will draw to much current if you turn on all leds on white color (12 leds x 20 milliAmps x 3 colors (to make white) = 720 mA. Wemos can handle 500 mA)
+//White means all leds Red/Green/Blue on so 3 x 20 mA per pixel. Just to be sure limited the Max setting to 200 instead of 255. No exact science though.
+IotWebConfNumberParameter ledBrightnessParam = IotWebConfNumberParameter("Led Brightness", "ledBrightness", ledBrightnessValue, NUMBER_LEN, "10","5..200", "min='5' max='200' step='5'"); //Limited to 200 (out of 255)
+
 
 #define PIN 4 //Neo pixel data pin (GPIO4 / D2)
 #define NUMBEROFLEDS 12 //the amount of Leds on the strip
@@ -142,16 +148,7 @@ void setup() {
   Serial.println("Starting up...");
 
 
-  //Setup Ledstrip
-  strip.begin();
-  strip.setBrightness(30);
-  strip.show(); // Initialize all pixels to 'off'
-  
-  strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the first led of the LedRing to Red; 
-  for(int x=1; x<NUMBEROFLEDS;x++){
-      strip.setPixelColor(x,strip.Color(0 ,0, 200)); //Set the remaining led to blue; 
-  }
-  strip.show(); 
+
 
 
   iotWebConf.setStatusPin(STATUS_PIN);
@@ -161,6 +158,7 @@ void setup() {
   iotWebConf.addSystemParameter(&mqttUserPasswordParam);
   iotWebConf.addSystemParameter(&mqttTopicParam);
   iotWebConf.addSystemParameter(&ledOffsetParam);
+  iotWebConf.addSystemParameter(&ledBrightnessParam);
   iotWebConf.setConfigSavedCallback(&configSaved);
   iotWebConf.setFormValidator(&formValidator);
   iotWebConf.getApTimeoutParameter()->visible = false; //set to true if you want to specify the timeout in portal
@@ -179,7 +177,19 @@ void setup() {
     mqttUserPasswordValue[0] = '\0';
     mqttTopicValue[0] ='\0';
     ledOffsetValue[0] = '\0';
+    ledBrightnessValue[0] = '\0';
   }
+  
+  //Setup Ledstrip
+  strip.begin();
+  strip.setBrightness(atoi(ledBrightnessValue));
+  strip.show(); // Initialize all pixels to 'off'
+  
+  strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the first led of the LedRing to Red; 
+  for(int x=1; x<NUMBEROFLEDS;x++){
+      strip.setPixelColor(x,strip.Color(0 ,0, 200)); //Set the remaining led to blue; 
+  }
+  strip.show(); 
 
   // -- Set up required URL handlers on the web server.
   server.on("/", handleRoot);
@@ -485,6 +495,9 @@ void handleRoot()
   s += "</div>";
   s += "<div>LED Offset: ";
   s += ledOffsetValue;
+  s += "</div>";
+  s += "<div>LED Brightness: ";
+  s += ledBrightnessValue;
   s += "</div>";
   s += "<button type='button' onclick=\"location.href='';\" >Refresh</button>";
   s += "<div>Go to <a href='config'>configure page</a> to change values.</div>";

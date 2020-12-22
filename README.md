@@ -9,6 +9,7 @@
     - [3.2. Initial setup of the device](#32-initial-setup-of-the-device)
         - [3.2.1. WiFi & MQTT](#321-wifi--mqtt)
         - [3.2.2. Led offset](#322-led-offset)
+        - [3.2.3. Led brightness](#323-led-brightness)
     - [3.3. Change configuration](#33-change-configuration)
     - [3.4. OTA Firmware update](#34-ota-firmware-update)
 - [4. Controlling the LED's](#4-controlling-the-leds)
@@ -89,6 +90,11 @@ To align the first led to the position where you want to see the first led, you 
 _As long as you have the configuration page open this green and red led will be displayed. Close the webpage (and reset the device) to get it running.
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/ledoffset.jpg "Demo of original position vs offset position")
+
+### 3.2.3. Led brightness ###
+You can set the brightness of the Leds on a value between 5 and 200. (if you really want and your powersupply can handle it you could change the max to 255 in the source code).
+Each LED Pixel is a Red, Green and Blue led. Each drawing up to 20 mA. So a bright white pixel draws 3 x 20 mA = 60 mA. All 12 LED Pixels on full white means a current of 720 mA.
+The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead of 255 as max and not using white pixels it should be fine. 
 
 ## 3.3. Change configuration ##
 Browse to the IP of your device and it will show the current setting and a link to the configuration page. Once you visit this page it will show the Led offset indicator.
