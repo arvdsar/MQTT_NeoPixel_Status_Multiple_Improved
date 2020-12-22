@@ -76,7 +76,7 @@ Never used PlatformIO? Check this page: [PlatformIO - How to flash firmware](htt
 Power on the device and connect your laptop to the wireless access point `"NeoPxLight"` with password `"password"`. Wait a little for a 'captive portal' to show. If it does not show, visit http://192.168.4.1 where you can configure the device.
 Be aware that you have to disconnect from this accesspoint after configuration before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to `"NeoPxLight"` if you need to.
 
-The field `AP password` sets you password when you want to access the configuration portal. For what I have experience now, it does not change the default password of the accesspoint of the device. Do not forget this password! If you need to reset it, you have to use wires!
+The field `AP password` sets you password when you want to access the configuration portal. Do not forget this password! If you need to reset it, you have to use wires!
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/SetAPPassword.png "Demo of original position vs offset position")
 
@@ -98,7 +98,7 @@ Each LED Pixel is a Red, Green and Blue led. Each drawing up to 20 mA. So a brig
 The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead of 255 as max and not using white pixels it should be fine. 
 
 ## 3.3. Change configuration ##
-Browse to the IP of your device and it will show the current setting and a link to the configuration page. Once you visit this page it will show the Led offset indicator.
+Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator.
 
 ## 3.4. OTA Firmware update ##
 You can update the firmware through the configuration page. 
