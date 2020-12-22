@@ -10,7 +10,6 @@ This is the improved version of the MQTT_NeoPixel_Status_Multiple. WiFiManager l
 This library keeps the configuration portal available so you don't have to reflash to change settings.
 It depends on IoTWebConf Libary v3.0.0 (not compatible with 2.x)
 
-
 IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
 and minimize distance between Arduino and first pixel.  Avoid connecting
@@ -18,7 +17,7 @@ on a live circuit...if you must, connect GND first.
 
 */
 
-#define VERSIONNUMBER "v1.0 - 21-12-2020"
+#define VERSIONNUMBER "v1.0.1 - 22-12-2020"
 
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
@@ -47,11 +46,11 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx2"
+#define CONFIG_VERSION "npx1"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
-//#define CONFIG_PIN D3
+#define CONFIG_PIN D3
 
 // -- Status indicator pin.
 //      First it will light up (kept LOW), on Wifi connection it will blink,
@@ -113,14 +112,26 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBEROFLEDS, PIN, NEO_GRB + NEO_KHZ
 // on a live circuit...if you must, connect GND first.
 
 int pixel = 0;      //Indicate which Pixel to light
-bool inConfig = 0;  //Indicator if you are on config portal or not (for blocking Led Pattern)
+int inConfig = 0;  //Indicator if you are on config portal or not (for blocking Led Pattern)
 long lastMsg = 0;   //timestamp of last MQTT Publish
 
-int ledStateArr[NUMBEROFLEDS]; //Store state of each led 
 long previous_time = 0;
 long current_time = 0;
 int blink = 0;           //to keep track of blinking status (on or off)
 bool needReset = false;
+
+/*
+Assume NUMBEROFLEDS is 12, so using a 12 pixel led ring (or strip)
+ledStateArr[] stores the state (color/blinking) of each Led Pixel. Leds start at 1 and count up.
+ledStateArr[1] contains the state of Led 1
+ledStateArr[12] contains the state of Led 12 
+ledStateArr[0] contains 'garbage'. If you would send a MQTT topic like: some/thing/13 which is a not existing led
+                                   then that will be captured and stored in ledStateArr[0] (only if content is valid)
+                                   The same applies if you would have some/thing/wrong. That would also go to [0] (only if content is valid)
+So this is a bit different than usual where Array position 0 is the first position. 
+From MQTT I want to drive Led 1 to 12. Not led 0 to 11.
+*/
+int ledStateArr[NUMBEROFLEDS+1]; //Store state of each led (where Led 1 = ledStateArr[1] and not ledStateArr[0])
 
 
 //***************************** SETUP ***************************************************
@@ -133,7 +144,7 @@ void setup() {
 
   //Setup Ledstrip
   strip.begin();
-  strip.setBrightness(10);
+  strip.setBrightness(30);
   strip.show(); // Initialize all pixels to 'off'
   
   strip.setPixelColor(0,strip.Color(255 ,0, 0)); //Set the first led of the LedRing to Red; 
@@ -155,7 +166,6 @@ void setup() {
   iotWebConf.getApTimeoutParameter()->visible = false; //set to true if you want to specify the timeout in portal
 
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
-  //iotWebConf.setupUpdateServer(&httpUpdater);
   iotWebConf.setupUpdateServer(
     [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
     [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
@@ -221,9 +231,20 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         LedId = atoi(token); 
         token = strtok(NULL, "/"); //break the while. LedId contains the last token
     } 
+  if(LedId > NUMBEROFLEDS) //Is it an invalid LedId outside the range of leds?
+    LedId = 0;             //Send the value to index 0 which is not used (ledStateArr[0] is not used)
+
+  //Serial.print("Token: ");
+  //Serial.println(LedId);
 
   payload[length] = '\0';
- 
+  
+  //Print payload to Serial for debugging
+  //for (unsigned int i=0;i<length;i++) { 
+  //  Serial.print((char)payload[i]);
+  //}
+
+
   /*
   Define color codes and with or without blink:
   green - greenblink (1 / 2)
@@ -321,11 +342,11 @@ void loop() {
   orange - orangeblink (11 / 12)
   off (0)
   */
- for (int x=0;x<NUMBEROFLEDS;x++){ //loop through all leds and set the required color (R,G,B)
+ for (int x=1;x<NUMBEROFLEDS+1;x++){ //loop through all leds and set the required color (R,G,B)
       client.loop(); //make sure MQTT Keeps running (hopefully prevents watchdog from kicking in)
 
         //Handle led_offset
-        pixel = x + atoi(ledOffsetValue);
+        pixel = (x-1) + atoi(ledOffsetValue);
         if(pixel > (NUMBEROFLEDS-1)){
             pixel = pixel - NUMBEROFLEDS;
         }
@@ -369,7 +390,7 @@ void loop() {
         }
   //BLUE
     else if(ledStateArr[x] == 9) //BLUE
-        strip.setPixelColor(x,strip.Color(0,0, 255)); //led on
+        strip.setPixelColor(pixel,strip.Color(0,0, 255)); //led on
     else if(ledStateArr[x] == 10){ //BLUE BLINKING)
         if(blink == 1)
           strip.setPixelColor(pixel,strip.Color(0,0, 255)); //led on
@@ -392,14 +413,15 @@ void loop() {
   } //end for-loop
 
 //Block updating the LEDs while in Configuration portal (inConfig)
+
 if(inConfig == 0) 
   strip.show(); //set all pixels  
  
  //Handle blinking of leds by switching blink value every x-milliseconds (blinktime)
  current_time = millis();
  if(current_time > previous_time + blinktime){
-   if (blink == 0)
-    blink = 1;
+    if (blink == 0)
+      blink = 1;
     else 
       blink = 0;
     previous_time = millis(); //set current time
