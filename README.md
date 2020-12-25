@@ -10,6 +10,7 @@
         - [3.2.1. WiFi & MQTT](#321-wifi--mqtt)
         - [3.2.2. Led offset](#322-led-offset)
         - [3.2.3. Led brightness](#323-led-brightness)
+        - [3.2.4. Single Status](#324-single-status)
     - [3.3. Change configuration](#33-change-configuration)
     - [3.4. OTA Firmware update](#34-ota-firmware-update)
 - [4. Controlling the LED's](#4-controlling-the-leds)
@@ -29,9 +30,9 @@ Website: [https://www.vdsar.net/build-status-light-for-devops/](https://www.vdsa
 
 Download: [Prebuild firmware binaries](https://www.vdsar.net/firmware-downloads/)
 
-Control each individual LED of a NeoPixel LedRing (or ledstrip) by publishing a color 'green, red, yellow, etc' to a specific MQTT Topic per Led.
+Control each individual LED or all leds together of a NeoPixel LedRing (or ledstrip) by publishing a color 'green, red, yellow, etc' to a specific MQTT Topic per Led.
 
-You could use it to indicate the build status of a CI/CD build pipeline.
+You could use it to indicate the build status of one or multiple CI/CD build pipeline(s)
 
 Flash an updated firmware or change the configuration directly from your browser.
 
@@ -51,9 +52,7 @@ This version requires the just released IotWebConf Library v3.x (incompatible wi
 
 The case can be 3D printed using PLA. The STL and Fusion360 files can be found here: <https://www.thingiverse.com/thing:4665511>
 
-The source code for the initial version where all leds indicate the status of one pipeline: <https://github.com/arvdsar/MQTT_NeoPixel_Status>
-
-The source code for the new version where each led indicates another pipeline. <https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved>
+The source code for the the recent version: <https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved>
 
 ## 2.2. Pinout & wiring ##
 * Connect 5V of LedRing with 5V on Wemos
@@ -97,6 +96,9 @@ You can set the brightness of the leds to a value between 5 and 200. (if you rea
 Each LED Pixel is a Red, Green and Blue led. Each drawing up to 20 mA. So a bright white pixel draws 3 x 20 mA = 60 mA. All 12 LED Pixels on full white means a current draw of 720 mA.
 The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead of 255 as max and not using white pixels it should be fine. 
 
+### 3.2.4. Single Status ###
+When you enable 'single status' it means that the whole ledring shows only the status of 1 MQTT topic (some/thing/1). If you deselect the 'single status', each led will represent a seperate topic (some/thing/1 up to sime/thing/12)
+
 ## 3.3. Change configuration ##
 Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator.
 
@@ -128,7 +130,8 @@ Led 12 --> `some/thing/12`
 
 ## 4.2. MQTT Payload ##
 To set the color of a LED you send a specific payload to the MQTT Topic of that LED. It is case sensitive. 
-You can choose to have a static LED or blinking LED.
+You can choose to have a static LED or blinking LED in the multiple status mode. In single status mode the whole ledring has either one color or in case of blink, the leds are chasing each other.
+
   * green 
   * greenblink 
   * red 
