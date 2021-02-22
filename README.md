@@ -97,7 +97,7 @@ Each LED Pixel is a Red, Green and Blue led. Each drawing up to 20 mA. So a brig
 The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead of 255 as max and not using white pixels it should be fine. 
 
 ### 3.2.4. Single Status ###
-When you enable 'single status' it means that the whole ledring shows only the status of 1 MQTT topic (some/thing/1). If you deselect the 'single status', each led will represent a seperate topic (some/thing/1 up to sime/thing/12)
+When you enable 'single status' it means that the whole ledring shows only the status of 1 MQTT topic (some/thing/1). If you deselect the 'single status', each led will represent a seperate topic (some/thing/1 up to some/thing/12)
 
 ## 3.3. Change configuration ##
 Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator.

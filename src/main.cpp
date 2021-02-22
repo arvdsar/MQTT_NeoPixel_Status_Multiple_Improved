@@ -17,9 +17,12 @@ on a live circuit...if you must, connect GND first.
 
 v1.2 - Added single status next to multiple statussus. (Publish color to some/thing/1 and the whole led ring will handle this color)
        For this you now find a checkbox 'single status' in the configuration page.
+v1.3 - Upgraded library (manually) to IotWebConf 3.0.0pre2 (this won't work from platformio.ini file, so copy library yourself into lib folder)
+       This can be fixed once a final version is on platformio. New library required small update in the code.
+       uncommented CONFIG_PIN D3 to allow reset of password using a wire instead of flashing 
 */
 
-#define VERSIONNUMBER "v1.2 - 25-12-2020"
+#define VERSIONNUMBER "v1.3 - 22-02-2021"
 
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
@@ -48,7 +51,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx4"
+#define CONFIG_VERSION "npx5"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -62,7 +65,7 @@ const char wifiInitialApPassword[] = "password";
 // -- Callback method declarations.
 void wifiConnected();
 void configSaved();
-boolean formValidator();
+bool formValidator(iotwebconf::WebRequestWrapper* webRequestWrapper);
 void handleRoot();
 void showLedOffset();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
@@ -578,7 +581,8 @@ void configSaved()
   needReset = true; 
 }
 
-boolean formValidator()
+bool formValidator(iotwebconf::WebRequestWrapper* webRequestWrapper)
+
 {
   Serial.println("Validating form.");
   boolean valid = true;
