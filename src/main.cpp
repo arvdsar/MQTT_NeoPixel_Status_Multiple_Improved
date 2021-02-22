@@ -8,7 +8,7 @@ Repository: https://github.com/arvdsar/MQTT_NeoPixel_Status_Multiple_Improved
 
 This is the improved version of the MQTT_NeoPixel_Status_Multiple. WiFiManager library is replaced with IotWebConf library
 This library keeps the configuration portal available so you don't have to reflash to change settings.
-It depends on IoTWebConf Libary v3.0.0 (not compatible with 2.x)
+It depends on IoTWebConf Libary v3.0.0pre2 (not compatible with 2.x)
 
 IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
@@ -19,7 +19,7 @@ v1.2 - Added single status next to multiple statussus. (Publish color to some/th
        For this you now find a checkbox 'single status' in the configuration page.
 v1.3 - Upgraded library (manually) to IotWebConf 3.0.0pre2 (this won't work from platformio.ini file, so copy library yourself into lib folder)
        This can be fixed once a final version is on platformio. New library required small update in the code.
-       uncommented CONFIG_PIN D3 to allow reset of password using a wire instead of flashing 
+       uncommented CONFIG_PIN D1 to allow reset of password using a wire instead of flashing 
 */
 
 #define VERSIONNUMBER "v1.3 - 22-02-2021"
@@ -51,11 +51,11 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx5"
+#define CONFIG_VERSION "npx6"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
-#define CONFIG_PIN D3
+#define CONFIG_PIN D1
 
 // -- Status indicator pin.
 //      First it will light up (kept LOW), on Wifi connection it will blink,
@@ -161,7 +161,7 @@ void setup() {
 
 
   iotWebConf.setStatusPin(STATUS_PIN);
-  //iotWebConf.setConfigPin(CONFIG_PIN);
+  iotWebConf.setConfigPin(CONFIG_PIN);
   iotWebConf.addSystemParameter(&mqttServerParam);
   iotWebConf.addSystemParameter(&mqttUserNameParam);
   iotWebConf.addSystemParameter(&mqttUserPasswordParam);
