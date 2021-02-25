@@ -36,7 +36,9 @@ You could use it to indicate the build status of one or multiple CI/CD build pip
 
 Flash an updated firmware or change the configuration directly from your browser.
 
-This version requires the just released IotWebConf Library v3.x (incompatible with v2.x)
+This version requires the just released (alpha) IotWebConf Library v3.0.0 pre2 (incompatible with v2.x)
+Currently the IoTWebConf Library will not be properly loaded by PlatformIO from the platformio.ini file.
+therefore the library is temporarily included in this repo.
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/IMG_3071-1.jpeg "Build Status Light")
 
@@ -59,7 +61,7 @@ The source code for the the recent version: <https://github.com/arvdsar/MQTT_Neo
 * Connect GND of LedRing with GND on Wemos
 * Connect DI (data in) of LedRing via the 470 ohm resistor with D2 on Wemos (GPIO4)
 * Put the 1000uF capacitor in parallel with the LedRing (so the + on 5v and – on the GND. _An Electrolytic capacitor has a + and – pin so pay attention!_
-
+* _connect D1 to GND during startup to force AP mode with initial password_
 An additional power supply is not required (for 12 Pixel ledring) as long as you don’t turn on all leds on white full power.
 
 # 3. Device Setup #
@@ -75,7 +77,8 @@ Never used PlatformIO? Check this page: [PlatformIO - How to flash firmware](htt
 Power on the device and connect your laptop to the wireless access point `"NeoPxLight"` with password `"password"`. Wait a little for a 'captive portal' to show. If it does not show, visit http://192.168.4.1 where you can configure the device.
 Be aware that you have to disconnect from this accesspoint after configuration before the device connects to your home WiFi. It also takes about 30 seconds after boot before the device switches to WiFi. In these first 30 seconds you can connect to `"NeoPxLight"` if you need to.
 
-The field `AP password` sets you password when you want to access the configuration portal. Do not forget this password! If you need to reset it, you have to use wires!
+The field `AP password` sets you password when you want to access the configuration portal AND it is indeed the new accesspoint password. Do not forget this password! If you need to reset it, you have to use a wire.
+Since v1.3 of the firmware you can force the accesspoint mode to remain active using the initial password by connecting pin D1 to GND at startup. Then you can connect to the '"NeoPxLight"' AP with '"password"' and configure a new password. 
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/SetAPPassword.png "Demo of original position vs offset position")
 
@@ -100,7 +103,7 @@ The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead 
 When you enable 'single status' it means that the whole ledring shows only the status of 1 MQTT topic (some/thing/1). If you deselect the 'single status', each led will represent a seperate topic (some/thing/1 up to some/thing/12)
 
 ## 3.3. Change configuration ##
-Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator.
+Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator when _not_ in single status mode.
 
 ## 3.4. OTA Firmware update ##
 You can update the firmware through the configuration page. 
