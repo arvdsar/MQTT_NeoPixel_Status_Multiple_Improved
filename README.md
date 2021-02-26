@@ -11,6 +11,7 @@
         - [3.2.2. Led offset](#322-led-offset)
         - [3.2.3. Led brightness](#323-led-brightness)
         - [3.2.4. Single Status](#324-single-status)
+        - [3.2.5. Single Status number](#325-single-status-number)
     - [3.3. Change configuration](#33-change-configuration)
     - [3.4. OTA Firmware update](#34-ota-firmware-update)
 - [4. Controlling the LED's](#4-controlling-the-leds)
@@ -101,6 +102,10 @@ The Wemos D1 onboard power regulator can handle max 500 mA. So with 200 instead 
 
 ### 3.2.4. Single Status ###
 When you enable 'single status' it means that the whole ledring shows only the status of 1 MQTT topic (some/thing/1). If you deselect the 'single status', each led will represent a seperate topic (some/thing/1 up to some/thing/12)
+
+### 3.2.5. Single Status number ###
+You are subscribed to a MQTT Topic like: `some/thing/#`. The idea is that # is a number of e.g. a build pipeline, a status of something, etc. When you enable the 'single status', then all the leds represent the status of one number (#). The Single Status number on the configuration page is that number. 
+So, let say you have 12 buildpipelines. `some/thing/1 to some/thing/12`. At a certain moment you want to keep monitoring the status of only one pipeline, lets say pipeline 5. You then enable the single status checkbox and you enter 5 in the Single status number field. 
 
 ## 3.3. Change configuration ##
 Browse to the IP of your device and login with `admin` and the `AP Password` which you have initially set. It will show the current setting and a link to the configuration page. Once you visit this page the device will show the led offset indicator when _not_ in single status mode.
