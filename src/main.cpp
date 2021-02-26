@@ -20,9 +20,10 @@ v1.2 - Added single status next to multiple statussus. (Publish color to some/th
 v1.3 - Upgraded library (manually) to IotWebConf 3.0.0pre2 (this won't work from platformio.ini file, so copy library yourself into lib folder)
        This can be fixed once a final version is on platformio. New library required small update in the code.
        uncommented CONFIG_PIN D1 to allow reset of password using a wire instead of flashing 
+v1.4 - Added new parameter to select a specific topic number for single display mode.
 */
 
-#define VERSIONNUMBER "v1.3 - 22-02-2021"
+#define VERSIONNUMBER "v1.4 - 26-02-2021"
 
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
@@ -51,7 +52,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx6"
+#define CONFIG_VERSION "npx7"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -92,6 +93,7 @@ char mqttTopicValue[STRING_LEN];
 char ledOffsetValue[NUMBER_LEN];
 char ledBrightnessValue[NUMBER_LEN];
 char singleStatusValue[STRING_LEN];
+char singleTopicValue[NUMBER_LEN];
 
 
 char mqttClientId[STRING_LEN]; //automatically created. not via config!
@@ -103,6 +105,7 @@ IotWebConfPasswordParameter mqttUserPasswordParam = IotWebConfPasswordParameter(
 IotWebConfTextParameter mqttTopicParam = IotWebConfTextParameter("MQTT Topic", "mqttTopic", mqttTopicValue, STRING_LEN,NULL,"some/thing/#");
 IotWebConfNumberParameter ledOffsetParam = IotWebConfNumberParameter("Led Offset", "ledOffset", ledOffsetValue, NUMBER_LEN, "0");
 IotWebConfCheckboxParameter singleStatusParam = IotWebConfCheckboxParameter("Single Status", "singleStatus", singleStatusValue, STRING_LEN,  false);
+IotWebConfNumberParameter singleTopicParam = IotWebConfNumberParameter("Single Topic # ", "singleTopic", singleTopicValue, NUMBER_LEN, "1");
 
 //LedBrightness: 255 is the max brightness. It will draw to much current if you turn on all leds on white color (12 leds x 20 milliAmps x 3 colors (to make white) = 720 mA. Wemos can handle 500 mA)
 //White means all leds Red/Green/Blue on so 3 x 20 mA per pixel. Just to be sure limited the Max setting to 200 instead of 255. No exact science though.
@@ -169,6 +172,8 @@ void setup() {
   iotWebConf.addSystemParameter(&ledOffsetParam);
   iotWebConf.addSystemParameter(&ledBrightnessParam);
   iotWebConf.addSystemParameter(&singleStatusParam);
+  iotWebConf.addSystemParameter(&singleTopicParam);
+
   iotWebConf.setConfigSavedCallback(&configSaved);
   iotWebConf.setFormValidator(&formValidator);
   iotWebConf.getApTimeoutParameter()->visible = false; //set to true if you want to specify the timeout in portal
@@ -189,6 +194,7 @@ void setup() {
     ledOffsetValue[0] = '\0';
     ledBrightnessValue[0] = '\0';
     singleStatusValue[0] = '\0';
+    singleTopicValue[0] = '\0';
   }
   
   //Setup Ledstrip
@@ -436,7 +442,8 @@ void loop() {
  } //end of if(singleStatusValue)
 
 if(singleStatusParam.isChecked()){ //true means we want to only show one status in total on all leds
-  int x = 1; 
+  int x = atoi(singleTopicValue); 
+  Serial.println(x);
   if(ledStateArr[x] == 1) //GREEN
       colorWipe(strip.Color(0, 255, 0), 100); // Green
   else if(ledStateArr[x] == 2) //GREEN BLINKING)
