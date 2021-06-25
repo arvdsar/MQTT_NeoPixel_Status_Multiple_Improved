@@ -37,9 +37,7 @@ You could use it to indicate the build status of one or multiple CI/CD build pip
 
 Flash an updated firmware or change the configuration directly from your browser.
 
-This version requires the just released (alpha) IotWebConf Library v3.0.0 pre2 (incompatible with v2.x)
-Currently the IoTWebConf Library will not be properly loaded by PlatformIO from the platformio.ini file.
-therefore the library is temporarily included in this repo.
+The current version (v1.5) requires IoTWebConf v3.1.0. The code is not compatible with an older version.
 
 ![alt text](https://www.vdsar.net/wordpress/wp-content/uploads/2020/12/IMG_3071-1.jpeg "Build Status Light")
 
