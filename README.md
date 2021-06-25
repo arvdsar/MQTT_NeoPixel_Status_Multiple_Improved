@@ -150,6 +150,8 @@ You can choose to have a static LED or blinking LED in the multiple status mode.
   * blueblink
   * orange
   * orangeblink 
+  * white (since firmware v1.5)
+  * whiteblink (since firmware v1.5)
   * off
 
 
