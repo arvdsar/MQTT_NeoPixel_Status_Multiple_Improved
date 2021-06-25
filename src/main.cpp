@@ -21,9 +21,10 @@ v1.3 - Upgraded library (manually) to IotWebConf 3.0.0pre2 (this won't work from
        This can be fixed once a final version is on platformio. New library required small update in the code.
        uncommented CONFIG_PIN D1 to allow reset of password using a wire instead of flashing 
 v1.4 - Added new parameter to select a specific topic number for single display mode.
+v1.5 - Updated to IoTWebConf library 3.1.0 and added WHITE light option
 */
 
-#define VERSIONNUMBER "v1.4 - 26-02-2021"
+#define VERSIONNUMBER "v1.5 - 25-06-2021"
 
 #include <ESP8266WiFi.h>        //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
@@ -52,7 +53,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx7"
+#define CONFIG_VERSION "npx9"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -109,7 +110,7 @@ IotWebConfNumberParameter singleTopicParam = IotWebConfNumberParameter("Single T
 
 //LedBrightness: 255 is the max brightness. It will draw to much current if you turn on all leds on white color (12 leds x 20 milliAmps x 3 colors (to make white) = 720 mA. Wemos can handle 500 mA)
 //White means all leds Red/Green/Blue on so 3 x 20 mA per pixel. Just to be sure limited the Max setting to 200 instead of 255. No exact science though.
-IotWebConfNumberParameter ledBrightnessParam = IotWebConfNumberParameter("Led Brightness", "ledBrightness", ledBrightnessValue, NUMBER_LEN, "10","5..200", "min='5' max='200' step='5'"); //Limited to 200 (out of 255)
+IotWebConfNumberParameter ledBrightnessParam = IotWebConfNumberParameter("Led Brightness", "ledBrightness", ledBrightnessValue, NUMBER_LEN, "60","5..200", "min='5' max='200' step='5'"); //Limited to 200 (out of 255)
 
 
 #define PIN 4 //Neo pixel data pin (GPIO4 / D2)
@@ -320,6 +321,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     else if(strcmp((char*)payload,"orangeblink") == 0){
           ledStateArr[LedId] = 12; 
   }
+    else if(strcmp((char*)payload,"white") == 0){
+          ledStateArr[LedId] = 13; 
+  }
+    else if(strcmp((char*)payload,"whiteblink") == 0){
+          ledStateArr[LedId] = 14; 
+  }
     else if(strcmp((char*)payload,"off") == 0){
           ledStateArr[LedId] = 0; 
   }
@@ -329,7 +336,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void reconnect() {
   // Loop until we're reconnected
-  while ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && !client.connected()) { 
+  while ((iotWebConf.getState() == iotwebconf::OnLine) && !client.connected()) { 
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     // If you do not want to use a username and password, change next line to
@@ -434,6 +441,15 @@ void loop() {
         else if(blink == 0)
              strip.setPixelColor(pixel,strip.Color(0,0, 0)); //led off
     }
+        //WHITE
+    else if(ledStateArr[x] == 13) //WHITE
+        strip.setPixelColor(pixel,strip.Color(200,200, 200)); //led on
+    else if(ledStateArr[x] == 14){ //WHITE (needs blinking)
+        if(blink == 1)
+          strip.setPixelColor(pixel,strip.Color(200,200, 200)); //led on
+        else if(blink == 0)
+             strip.setPixelColor(pixel,strip.Color(0,0, 0)); //led off
+    }
     //OFF
      else if(ledStateArr[x] == 0) //LED OFF
         strip.setPixelColor(pixel,strip.Color(0,0, 0)); //led off
@@ -479,7 +495,11 @@ if(singleStatusParam.isChecked()){ //true means we want to only show one status 
           colorWipe(strip.Color(255, 128, 0), 100); 
   else if(ledStateArr[x] == 12) //ORANGE Blink
           theaterChase(strip.Color(255,128, 0), 120); 
-
+  //WHITE SINGLE STATUS  
+  else if(ledStateArr[x] == 13) //WHITE
+          colorWipe(strip.Color(200, 200, 200), 100); 
+  else if(ledStateArr[x] == 14) //WHITE Blink
+          theaterChase(strip.Color(200, 200, 200), 120); 
 
 }
 //Block updating the LEDs while in Configuration portal (inConfig)
