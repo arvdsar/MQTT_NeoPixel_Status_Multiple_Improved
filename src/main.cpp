@@ -53,7 +53,7 @@ const char wifiInitialApPassword[] = "password";
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "npx9"
+#define CONFIG_VERSION "npx10"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)

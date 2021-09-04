@@ -29,7 +29,7 @@ Github Repository: [MQTT_NeoPixel_Status_Multiple_Improved ](https://github.com/
 
 Website: [https://www.vdsar.net/build-status-light-for-devops/](https://www.vdsar.net/build-status-light-for-devops/)
 
-Download: [Prebuild firmware binaries](https://www.vdsar.net/firmware-downloads/)
+Download: [Prebuild firmware binaries](https://www.vdsar.net/download-category/firmware/)
 
 Control each individual LED or all leds together of a NeoPixel LedRing (or ledstrip) by publishing a color 'green, red, yellow, etc' to a specific MQTT Topic per Led.
 
